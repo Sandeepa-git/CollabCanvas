@@ -3,7 +3,8 @@ import path from "node:path";
 import initSqlJs, { Database } from "sql.js";
 import type { AnalysisResult, BoardRecord } from "@/lib/types";
 
-const dataDir = path.join(process.cwd(), ".data");
+const isVercel = !!process.env.VERCEL;
+const dataDir = isVercel ? "/tmp" : path.join(process.cwd(), ".data");
 const dbPath = path.join(dataDir, "collabcanvas.sqlite");
 
 let dbPromise: Promise<Database> | null = null;
