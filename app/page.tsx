@@ -438,33 +438,30 @@ export default function Home() {
             isDark ? "bg-slate-900/30 border-white/5" : "bg-slate-100/30 border-slate-200"
           }`}>
             
-            {/* Loading Overlay */}
-            {isLoading && (
-              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center z-50 transition-all duration-300">
+            {isLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center min-h-[600px] z-50">
                 <div className="relative h-16 w-16 mb-6">
                   <div className="absolute inset-0 rounded-full border-4 border-teal-500/10" />
                   <div className="absolute inset-0 rounded-full border-4 border-t-teal-400 animate-spin" />
                 </div>
-                <h3 className="text-xl font-extrabold text-white">Synthesizing Creative Canvas</h3>
-                <p className="text-xs text-slate-400 mt-2">Running ensemble parsing & semantic calculations...</p>
-                <div className="mt-6 flex flex-col gap-2 items-start w-56 text-xxs font-semibold text-slate-400">
-                  <div className="flex items-center gap-2 text-teal-400">
-                    <CheckCircle size={12} className="text-teal-400" />
+                <h3 className="text-xl font-extrabold text-[var(--text-primary)]">Synthesizing Creative Canvas</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-2">Running ensemble parsing & semantic calculations...</p>
+                <div className="mt-6 flex flex-col gap-2 items-start w-56 text-xxs font-semibold text-[var(--text-secondary)]">
+                  <div className="flex items-center gap-2 text-emerald-500 dark:text-emerald-400">
+                    <CheckCircle size={12} />
                     Connecting to backend nodes
                   </div>
-                  <div className="flex items-center gap-2 text-teal-400">
-                    <CheckCircle size={12} className="text-teal-400" />
+                  <div className="flex items-center gap-2 text-emerald-500 dark:text-emerald-400">
+                    <CheckCircle size={12} />
                     Invoking OpenRouter
                   </div>
-                  <div className="flex items-center gap-2 text-slate-300 animate-pulse">
+                  <div className="flex items-center gap-2 text-[var(--text-primary)] animate-pulse">
                     <Clock size={12} />
                     Merging and mapping nodes...
                   </div>
                 </div>
               </div>
-            )}
-
-            {analysis ? (
+            ) : analysis ? (
               <div
                 className="flex flex-col gap-6"
                 style={
