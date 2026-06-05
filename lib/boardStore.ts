@@ -1,27 +1,7 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, terminate } from "firebase/firestore";
 import type { AnalysisResult, BoardRecord } from "@/lib/types";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCqq33EG5vKa_biTSLHjKyNe-wvD5qDwNc",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "collabcanvas-5b994.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "collabcanvas-5b994",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "collabcanvas-5b994.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "103330337790",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:103330337790:web:733f2155071c381cd966af"
-};
-
-async function executeFirestore<T>(callback: (db: any) => Promise<T>): Promise<T> {
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  const db = getFirestore(app);
-  try {
-    return await callback(db);
-  } finally {
-    // Terminate the Firestore database connection to release TCP sockets and background timers.
-    // This allows the Vercel serverless execution environment to finalize and return HTTP responses instantly.
-    await terminate(db).catch(() => {});
-  }
-}
+// In-memory store for demonstration purposes
+let boards: BoardRecord[] = [];
 
 function recordFromAnalysis(analysis: AnalysisResult): BoardRecord {
   const createdAt = analysis.createdAt ?? new Date().toISOString();
@@ -60,39 +40,22 @@ function recordFromAnalysis(analysis: AnalysisResult): BoardRecord {
 
 export async function saveBoard(analysis: AnalysisResult) {
   const record = recordFromAnalysis(analysis);
-  return await executeFirestore(async (db) => {
-    await setDoc(doc(db, "boards", record.id), record);
-    return record;
-  });
+  const existingIndex = boards.findIndex(b => b.id === record.id);
+  if (existingIndex >= 0) {
+    boards[existingIndex] = record;
+  } else {
+    boards.push(record);
+  }
+  return record;
 }
 
 export async function listBoards(searchQuery = "", sentiment = "all") {
-  return await executeFirestore(async (db) => {
-    try {
-      const boardsCol = collection(db, "boards");
-      const q = query(boardsCol, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
-      
-      const boards = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as BoardRecord;
-        return {
-          ...data,
-          topics: Array.isArray(data.topics) ? data.topics : [],
-          createdAt: data.createdAt ?? new Date().toISOString(),
-          sentiment: data.sentiment ?? "neutral",
-          sentimentScore: typeof data.sentimentScore === "number" ? data.sentimentScore : 0
-        };
-      });
+  let sortedBoards = [...boards].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      return boards.filter((board) => {
-        const haystack = `${board.title} ${board.summary} ${board.topics.join(" ")}`.toLowerCase();
-        const matchesQuery = !searchQuery || haystack.includes(searchQuery.toLowerCase());
-        const matchesSentiment = sentiment === "all" || board.sentiment === sentiment;
-        return matchesQuery && matchesSentiment;
-      });
-    } catch (error) {
-      console.error("Firestore listBoards error:", error);
-      return [];
-    }
+  return sortedBoards.filter((board) => {
+    const haystack = `${board.title} ${board.summary} ${board.topics.join(" ")}`.toLowerCase();
+    const matchesQuery = !searchQuery || haystack.includes(searchQuery.toLowerCase());
+    const matchesSentiment = sentiment === "all" || board.sentiment === sentiment;
+    return matchesQuery && matchesSentiment;
   });
 }

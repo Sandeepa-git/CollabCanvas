@@ -279,6 +279,51 @@ ${text}`
   }
 }
 
+// 4. Azure OpenAI Client Call (Initialized with Endpoint and Deployment Key)
+async function queryAzureOpenAI(
+  client: OpenAI | null,
+  text: string
+): Promise<Omit<AnalysisResult, "palette"> | null> {
+  if (!client) return null;
+  try {
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini", // Ignore by Azure gateway, but required for SDK typing
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Analyze this collaboration text and fit this JSON shape:
+{
+  "summary": "string",
+  "sentiment": "positive | neutral | negative",
+  "sentimentScore": -1 to 1,
+  "keywords": ["string"],
+  "themes": [{"label":"string","weight":0-100,"group":"design|engineering|marketing|operations|strategy"}],
+  "semanticClusters": {"cluster name":["keyword"]},
+  "workIQ": {"participants":["string"],"deadlines":["string"],"topics":["string"]},
+  "fabricIQGroups": {"design":["string"],"engineering":["string"],"marketing":["string"],"operations":["string"],"strategy":["string"]},
+  "conceptLinks": [{"source":"string","target":"string","label":"string"}]
+}
+
+Text:
+${text}`
+        }
+      ]
+    }, {
+      timeout: 8000
+    });
+
+    const content = response.choices[0]?.message.content;
+    if (!content) return null;
+    return JSON.parse(content) as Omit<AnalysisResult, "palette">;
+  } catch (err) {
+    console.error("Azure OpenAI Analysis call failed:", err);
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const { text, sourceType = "text" } = (await request.json()) as {
     text?: string;
@@ -291,9 +336,10 @@ export async function POST(request: Request) {
 
   const geminiKey = process.env.GEMINI_API_KEY;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const azureKey = process.env.AZURE_OPENAI_API_KEY;
 
-  // If neither key is provided, run in complete Mock Mode
-  if (!geminiKey && !openRouterKey) {
+  // If no LLM keys are provided, run in complete Mock Mode
+  if (!geminiKey && !openRouterKey && !azureKey) {
     const mockData = buildMockAnalysis(text);
     const foundryIQ = await enrichWithFoundryIQ(text, mockData.keywords);
     const mock = {
@@ -315,7 +361,20 @@ export async function POST(request: Request) {
         })
       : null;
 
-    // 2. Query Google Gemini Direct (using native REST API to accept AQ.Ab key formats)
+    // 2. Initialize Azure OpenAI client if credentials are present
+    const rawAzureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const azureEndpoint = rawAzureEndpoint ? rawAzureEndpoint.replace(/\/openai\/v1\/?$/, "").replace(/\/$/, "") : "";
+    const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o-mini";
+    const azureClient = azureKey && azureEndpoint
+      ? new OpenAI({
+          apiKey: azureKey,
+          baseURL: `${azureEndpoint}/openai/deployments/${azureDeployment}`,
+          defaultQuery: { "api-version": "2024-06-01" },
+          defaultHeaders: { "api-key": azureKey }
+        })
+      : null;
+
+    // 3. Query Google Gemini Direct (using native REST API to accept AQ.Ab key formats)
     const geminiPromise = geminiKey
       ? queryGeminiNative(
           geminiKey,
@@ -325,7 +384,7 @@ export async function POST(request: Request) {
         )
       : Promise.resolve(null);
 
-    // 3. Query OpenRouter (defaulting to the universal openrouter/free wrapper)
+    // 4. Query OpenRouter (defaulting to the universal openrouter/free wrapper)
     const openRouterPromise = openRouterKey
       ? queryOpenRouter(
           openRouterClient,
@@ -335,27 +394,33 @@ export async function POST(request: Request) {
         )
       : Promise.resolve(null);
 
-    // 4. Query native Gemini embedding if key is present
+    // 5. Query Azure OpenAI
+    const azurePromise = azureClient
+      ? queryAzureOpenAI(azureClient, text)
+      : Promise.resolve(null);
+
+    // 6. Query native Gemini embedding if key is present
     const embeddingPromise = geminiKey
       ? createGeminiNativeEmbedding(geminiKey, text)
       : Promise.resolve(undefined);
 
-    const [geminiResult, openRouterResult, embeddings] = await Promise.all([
+    const [geminiResult, openRouterResult, azureResult, embeddings] = await Promise.all([
       geminiPromise,
       openRouterPromise,
+      azurePromise,
       embeddingPromise
     ]);
 
     // Handle results
-    if (!geminiResult && !openRouterResult) {
-      throw new Error("Both Gemini and OpenRouter API calls returned empty or failed.");
+    const results = [geminiResult, openRouterResult, azureResult].filter(Boolean) as Omit<AnalysisResult, "palette">[];
+    if (results.length === 0) {
+      throw new Error("All LLM API calls (Gemini, OpenRouter, and Azure OpenAI) returned empty or failed.");
     }
 
-    let parsed: Omit<AnalysisResult, "palette">;
-    if (geminiResult && openRouterResult) {
-      parsed = mergeAnalysisResults(geminiResult, openRouterResult);
-    } else {
-      parsed = (geminiResult || openRouterResult) as Omit<AnalysisResult, "palette">;
+    // Merge all successful analysis responses
+    let parsed = results[0];
+    for (let i = 1; i < results.length; i++) {
+      parsed = mergeAnalysisResults(parsed, results[i]) as Omit<AnalysisResult, "palette">;
     }
 
     // Enrich with IQ endpoints if configured, otherwise fall back to parsed values
@@ -364,7 +429,7 @@ export async function POST(request: Request) {
     const foundryIQ = await enrichWithFoundryIQ(text, parsed.keywords);
 
     // Call background art generation using OpenRouter client as fallback if needed
-    const activeClient = openRouterClient;
+    const activeClient = openRouterClient || azureClient;
     const backgroundImageUrl = activeClient
       ? await createBackgroundArt(activeClient, parsed.keywords.join(", "))
       : undefined;
