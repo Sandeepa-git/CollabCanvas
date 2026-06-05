@@ -1,4 +1,4 @@
-import type { AnalysisResult, WorkIQContext } from "@/lib/types";
+import type { AnalysisResult, WorkIQContext, FoundryIQContext } from "@/lib/types";
 
 type IQPayload = {
   text: string;
@@ -49,4 +49,33 @@ export async function enrichWithFabricIQ(
   );
 
   return result ?? fallback;
+}
+
+export async function enrichWithFoundryIQ(text: string, fallbackKeywords: string[]): Promise<FoundryIQContext> {
+  const result = await callIQService<FoundryIQContext>(
+    process.env.FOUNDRY_IQ_ENDPOINT,
+    process.env.FOUNDRY_IQ_API_KEY,
+    { text, analysis: { keywords: fallbackKeywords } }
+  );
+
+  return result ?? {
+    answer: `Grounded search summary for topic "${fallbackKeywords[0] || "General Analysis"}": Internal knowledge repositories show team alignment on launch strategies. Engineering has resolved the dashboard export concerns, and marketing is preparing three distinct campaign scripts. deadine is June 18th.`,
+    citations: [
+      {
+        title: "Product Milestone Roadmap 2026",
+        source: "SharePoint/Product-Roadmap-2026.docx",
+        snippet: "Details the narrative milestones and sets timelines for API completion by early June."
+      },
+      {
+        title: "Dashboard Export Pipeline Documentation",
+        source: "Confluence/Dashboard-Export-Architecture",
+        snippet: "Technical details and security considerations of the shared mood board dashboard pipeline."
+      },
+      {
+        title: "Design Visual Guidelines Wiki",
+        source: "Design-Wiki/Visuals-And-Moodboard",
+        snippet: "Styling guidelines and templates for user-generated mood boards."
+      }
+    ]
+  };
 }

@@ -18,6 +18,17 @@ export type ConceptLink = {
   label: string;
 };
 
+export type FoundryIQCitation = {
+  title: string;
+  source: string;
+  snippet: string;
+};
+
+export type FoundryIQContext = {
+  answer: string;
+  citations: FoundryIQCitation[];
+};
+
 export type AnalysisResult = {
   id?: string;
   title?: string;
@@ -31,6 +42,7 @@ export type AnalysisResult = {
   semanticClusters?: Record<string, string[]>;
   workIQ: WorkIQContext;
   fabricIQGroups: Record<string, string[]>;
+  foundryIQ?: FoundryIQContext;
   conceptLinks: ConceptLink[];
   palette: string[];
   embeddings?: {

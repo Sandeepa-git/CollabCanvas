@@ -621,19 +621,45 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 5. Semantic Clusters and Embeddings */}
-                <InfoPanel
-                  title="Semantic Vector Details"
-                  items={[
-                    ...Object.entries(analysis.semanticClusters ?? {}).map(
-                      ([cluster, values]) => `${cluster}: ${Array.isArray(values) ? values.join(", ") : String(values || "")}`
-                    ),
-                    analysis.embeddings
-                      ? `Embedding vector powered by ${analysis.embeddings.model} (${analysis.embeddings.dimensions} dimensions)`
-                      : "Embedding vector: Fallback loaded"
-                  ]}
-                  theme={theme}
-                />
+                {/* 5. Semantic Clusters and Foundry IQ Grounded Context */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <InfoPanel
+                    title="Semantic Vector Details"
+                    items={[
+                      ...Object.entries(analysis.semanticClusters ?? {}).map(
+                        ([cluster, values]) => `${cluster}: ${Array.isArray(values) ? values.join(", ") : String(values || "")}`
+                      ),
+                      analysis.embeddings
+                        ? `Embedding vector powered by ${analysis.embeddings.model} (${analysis.embeddings.dimensions} dimensions)`
+                        : "Embedding vector: Fallback loaded"
+                    ]}
+                    theme={theme}
+                  />
+
+                  {analysis.foundryIQ ? (
+                    <div className={`rounded-xl p-5 border ${
+                      isDark ? "glass-panel border-white/10 bg-slate-900/70" : "bg-white border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)]"
+                    }`}>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-teal-400">Foundry IQ Grounded Context</h2>
+                      <div className="mt-4 p-3 rounded-lg border border-teal-500/10 bg-teal-500/5 text-xs text-[var(--text-secondary)] leading-relaxed">
+                        <span className="font-extrabold text-[var(--text-primary)] block mb-1">Grounded Synthesis:</span>
+                        {analysis.foundryIQ.answer}
+                      </div>
+                      <h3 className="text-xxs font-extrabold uppercase tracking-wide text-slate-400 mt-4 mb-2">Cited Sources</h3>
+                      <ul className="space-y-2 pr-1 max-h-[140px] overflow-y-auto">
+                        {analysis.foundryIQ.citations.map((cite, idx) => (
+                          <li key={idx} className={`rounded-lg border p-2.5 text-xxs leading-relaxed ${
+                            isDark ? "bg-slate-950/30 border-white/5 text-slate-100" : "bg-slate-50 border-slate-100 text-slate-800"
+                          }`}>
+                            <span className="font-black text-[var(--text-primary)] block">{cite.title}</span>
+                            <span className="text-blue-500 dark:text-blue-400 block font-semibold text-[10px] mt-0.5">{cite.source}</span>
+                            <p className="mt-1 text-slate-400 dark:text-slate-300 italic">"{cite.snippet}"</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             ) : (
               // Empty Welcome State

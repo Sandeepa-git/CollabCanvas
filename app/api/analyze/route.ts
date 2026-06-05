@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { buildMockAnalysis, paletteForSentiment } from "@/lib/mockAnalysis";
 import { saveBoard } from "@/lib/boardStore";
-import { enrichWithFabricIQ, enrichWithWorkIQ } from "@/lib/iq";
+import { enrichWithFabricIQ, enrichWithWorkIQ, enrichWithFoundryIQ } from "@/lib/iq";
 import { createBackgroundArt } from "@/lib/openaiExtras";
 import type { AnalysisResult } from "@/lib/types";
 
@@ -294,10 +294,13 @@ export async function POST(request: Request) {
 
   // If neither key is provided, run in complete Mock Mode
   if (!geminiKey && !openRouterKey) {
+    const mockData = buildMockAnalysis(text);
+    const foundryIQ = await enrichWithFoundryIQ(text, mockData.keywords);
     const mock = {
-      ...buildMockAnalysis(text),
+      ...mockData,
       sourceType,
-      semanticClusters: buildMockAnalysis(text).fabricIQGroups
+      foundryIQ,
+      semanticClusters: mockData.fabricIQGroups
     };
     const board = await saveBoard(mock);
     return NextResponse.json(board.analysis);
@@ -358,6 +361,7 @@ export async function POST(request: Request) {
     // Enrich with IQ endpoints if configured, otherwise fall back to parsed values
     const workIQ = await enrichWithWorkIQ(text, parsed.workIQ);
     const fabricIQGroups = await enrichWithFabricIQ(text, parsed, parsed.fabricIQGroups);
+    const foundryIQ = await enrichWithFoundryIQ(text, parsed.keywords);
 
     // Call background art generation using OpenRouter client as fallback if needed
     const activeClient = openRouterClient;
@@ -370,6 +374,7 @@ export async function POST(request: Request) {
       sourceType,
       workIQ,
       fabricIQGroups,
+      foundryIQ,
       semanticClusters: parsed.semanticClusters ?? fabricIQGroups,
       palette: paletteForSentiment(parsed.sentiment),
       embeddings,
@@ -380,10 +385,13 @@ export async function POST(request: Request) {
     return NextResponse.json(board.analysis);
   } catch (error) {
     console.error("Ensemble API handler failed, falling back to mock mode:", error);
+    const mockData = buildMockAnalysis(text);
+    const foundryIQ = await enrichWithFoundryIQ(text, mockData.keywords);
     const fallback = {
-      ...buildMockAnalysis(text),
+      ...mockData,
       sourceType,
-      semanticClusters: buildMockAnalysis(text).fabricIQGroups
+      foundryIQ,
+      semanticClusters: mockData.fabricIQGroups
     };
     const board = await saveBoard(fallback);
     return NextResponse.json(board.analysis);
