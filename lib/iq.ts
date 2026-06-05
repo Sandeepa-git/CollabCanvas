@@ -28,13 +28,17 @@ async function callIQService<T>(endpoint: string | undefined, apiKey: string | u
 }
 
 export async function enrichWithWorkIQ(text: string, fallback: WorkIQContext): Promise<WorkIQContext> {
-  const result = await callIQService<WorkIQContext>(
-    process.env.WORK_IQ_ENDPOINT,
-    process.env.WORK_IQ_API_KEY,
-    { text }
-  );
-
-  return result ?? fallback;
+  try {
+    const result = await callIQService<WorkIQContext>(
+      process.env.WORK_IQ_ENDPOINT,
+      process.env.WORK_IQ_API_KEY,
+      { text }
+    );
+    return result ?? fallback;
+  } catch (err) {
+    console.warn("Work IQ service failed, using fallback:", err);
+    return fallback;
+  }
 }
 
 export async function enrichWithFabricIQ(
@@ -42,23 +46,21 @@ export async function enrichWithFabricIQ(
   analysis: Partial<AnalysisResult>,
   fallback: Record<string, string[]>
 ) {
-  const result = await callIQService<Record<string, string[]>>(
-    process.env.FABRIC_IQ_ENDPOINT,
-    process.env.FABRIC_IQ_API_KEY,
-    { text, analysis }
-  );
-
-  return result ?? fallback;
+  try {
+    const result = await callIQService<Record<string, string[]>>(
+      process.env.FABRIC_IQ_ENDPOINT,
+      process.env.FABRIC_IQ_API_KEY,
+      { text, analysis }
+    );
+    return result ?? fallback;
+  } catch (err) {
+    console.warn("Fabric IQ service failed, using fallback:", err);
+    return fallback;
+  }
 }
 
 export async function enrichWithFoundryIQ(text: string, fallbackKeywords: string[]): Promise<FoundryIQContext> {
-  const result = await callIQService<FoundryIQContext>(
-    process.env.FOUNDRY_IQ_ENDPOINT,
-    process.env.FOUNDRY_IQ_API_KEY,
-    { text, analysis: { keywords: fallbackKeywords } }
-  );
-
-  return result ?? {
+  const fallbackData: FoundryIQContext = {
     answer: `Grounded search summary for topic "${fallbackKeywords[0] || "General Analysis"}": Internal knowledge repositories show team alignment on launch strategies. Engineering has resolved the dashboard export concerns, and marketing is preparing three distinct campaign scripts. deadine is June 18th.`,
     citations: [
       {
@@ -78,4 +80,16 @@ export async function enrichWithFoundryIQ(text: string, fallbackKeywords: string
       }
     ]
   };
+
+  try {
+    const result = await callIQService<FoundryIQContext>(
+      process.env.FOUNDRY_IQ_ENDPOINT,
+      process.env.FOUNDRY_IQ_API_KEY,
+      { text, analysis: { keywords: fallbackKeywords } }
+    );
+    return result ?? fallbackData;
+  } catch (err) {
+    console.warn("Foundry IQ service failed, using fallback:", err);
+    return fallbackData;
+  }
 }
