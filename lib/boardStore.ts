@@ -11,7 +11,9 @@ let dbPromise: Promise<Database> | null = null;
 
 async function getDb() {
   if (!dbPromise) {
-    dbPromise = initSqlJs().then((SQL) => {
+    dbPromise = initSqlJs({
+      locateFile: (file) => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/${file}`
+    }).then((SQL) => {
       if (!existsSync(dataDir)) {
         mkdirSync(dataDir, { recursive: true });
       }
