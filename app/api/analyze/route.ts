@@ -173,6 +173,10 @@ ${text}`
 
     if (!response.ok) {
       const errText = await response.text();
+      if (response.status === 404 && !modelName && model === defaultModel) {
+        console.warn(`Gemini model "${model}" not available; retrying with fallback model.`);
+        return queryGeminiNative(apiKey, "gemini-1.5", defaultModel, text);
+      }
       throw new Error(`Gemini native call returned status ${response.status}: ${errText}`);
     }
 
@@ -191,9 +195,10 @@ ${text}`
 // 2. Google Gemini Native Embedding API Call
 async function createGeminiNativeEmbedding(
   apiKey: string,
-  text: string
+  text: string,
+  modelName?: string
 ) {
-  const model = process.env.GEMINI_EMBEDDING_MODEL || "text-embedding-004";
+  const model = modelName || process.env.GEMINI_EMBEDDING_MODEL || "text-embedding-gecko-001";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`;
 
   try {
@@ -211,6 +216,10 @@ async function createGeminiNativeEmbedding(
 
     if (!response.ok) {
       const errText = await response.text();
+      if (response.status === 404 && !modelName && model === "text-embedding-gecko-001") {
+        console.warn(`Gemini embedding model "${model}" not available; retrying with fallback model text-embedding-gecko-002.`);
+        return createGeminiNativeEmbedding(apiKey, text, "text-embedding-gecko-002");
+      }
       throw new Error(`Embedding status ${response.status}: ${errText}`);
     }
 
@@ -240,16 +249,20 @@ async function queryOpenRouter(
 ): Promise<Omit<AnalysisResult, "palette"> | null> {
   if (!client) return null;
   const model = modelName || defaultModel;
-  try {
-    const response = await client.chat.completions.create({
-      model,
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Analyze this collaboration text and fit this JSON shape:
+  const maxAttempts = 3;
+  let attempt = 0;
+
+  while (attempt < maxAttempts) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Analyze this collaboration text and fit this JSON shape:
 {
   "summary": "string",
   "sentiment": "positive | neutral | negative",
@@ -264,19 +277,31 @@ async function queryOpenRouter(
 
 Text:
 ${text}`
-        }
-      ]
-    }, {
-      timeout: 8000
-    });
+          }
+        ]
+      }, {
+        timeout: 8000
+      });
 
-    const content = response.choices[0]?.message.content;
-    if (!content) return null;
-    return JSON.parse(content) as Omit<AnalysisResult, "palette">;
-  } catch (err) {
-    console.error(`OpenRouter Analysis: Model ${model} call failed:`, err);
-    return null;
+      const content = response.choices[0]?.message.content;
+      if (!content) return null;
+      return JSON.parse(content) as Omit<AnalysisResult, "palette">;
+    } catch (err) {
+      const errInfo = err as any;
+      const rateLimit = errInfo?.code === 429 || errInfo?.status === 429;
+      if (rateLimit && attempt < maxAttempts - 1) {
+        const backoff = 500 * Math.pow(2, attempt);
+        console.warn(`OpenRouter rate limited, retrying in ${backoff}ms (attempt ${attempt + 1}/${maxAttempts})`);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+        attempt += 1;
+        continue;
+      }
+      console.error(`OpenRouter Analysis: Model ${model} call failed:`, err);
+      return null;
+    }
   }
+
+  return null;
 }
 
 // 4. Azure OpenAI Client Call (Initialized with Endpoint and Deployment Key)
@@ -285,9 +310,13 @@ async function queryAzureOpenAI(
   text: string
 ): Promise<Omit<AnalysisResult, "palette"> | null> {
   if (!client) return null;
+
+  const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o-mini";
+  const model = process.env.AZURE_OPENAI_MODEL || azureDeployment;
+
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // Ignore by Azure gateway, but required for SDK typing
+      model,
       response_format: { type: "json_object" },
       temperature: 0.3,
       messages: [
@@ -337,9 +366,10 @@ export async function POST(request: Request) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const azureKey = process.env.AZURE_OPENAI_API_KEY;
+  const disableOpenRouter = process.env.DISABLE_OPENROUTER === "true";
 
   // If no LLM keys are provided, run in complete Mock Mode
-  if (!geminiKey && !openRouterKey && !azureKey) {
+  if (!geminiKey && (!openRouterKey || disableOpenRouter) && !azureKey) {
     const mockData = buildMockAnalysis(text);
     const foundryIQ = await enrichWithFoundryIQ(text, mockData.keywords);
     const mock = {
@@ -353,8 +383,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Initialize OpenRouter client if key is present
-    const openRouterClient = openRouterKey
+    // 1. Initialize OpenRouter client if key is present and not explicitly disabled
+    const openRouterClient = openRouterKey && !disableOpenRouter
       ? new OpenAI({
           apiKey: openRouterKey,
           baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1"
@@ -379,13 +409,13 @@ export async function POST(request: Request) {
       ? queryGeminiNative(
           geminiKey,
           process.env.GEMINI_MODEL,
-          "gemini-1.5-flash",
+          "gemini-1.5-pro",
           text
         )
       : Promise.resolve(null);
 
     // 4. Query OpenRouter (defaulting to the universal openrouter/free wrapper)
-    const openRouterPromise = openRouterKey
+    const openRouterPromise = openRouterClient
       ? queryOpenRouter(
           openRouterClient,
           process.env.OPENROUTER_MODEL,

@@ -419,7 +419,17 @@ export default function Home() {
               {isLoading ? "Ensemble Analyzing..." : "Generate Mood Board"}
             </button>
 
-
+            {analysis ? (
+              <button
+                type="button"
+                onClick={createShareLink}
+                disabled={isLoading}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3.5 text-sm font-bold text-teal-400 transition hover:bg-teal-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Link2 size={16} />
+                Copy Share Link
+              </button>
+            ) : null}
 
             {error ? (
               <p className="rounded-lg bg-rose-500/10 border border-rose-500/15 p-3 text-xs font-bold text-rose-400">
@@ -653,7 +663,7 @@ export default function Home() {
                           }`}>
                             <span className="font-black text-[var(--text-primary)] block">{cite.title}</span>
                             <span className="text-blue-500 dark:text-blue-400 block font-semibold text-[10px] mt-0.5">{cite.source}</span>
-                            <p className="mt-1 text-slate-400 dark:text-slate-300 italic">"{cite.snippet}"</p>
+                            <p className="mt-1 text-slate-400 dark:text-slate-300 italic">&quot;{cite.snippet}&quot;</p>
                           </li>
                         ))}
                       </ul>
