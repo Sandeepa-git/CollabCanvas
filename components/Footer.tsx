@@ -7,7 +7,10 @@ import Link from "next/link";
 export function Footer() {
   const [envStatus, setEnvStatus] = useState({
     openRouter: false,
-    azureSpeech: false
+    azureSpeech: false,
+    workIQ: false,
+    fabricIQ: false,
+    foundryIQ: false
   });
 
   useEffect(() => {
@@ -16,7 +19,10 @@ export function Footer() {
       .then((data) => {
         setEnvStatus({
           openRouter: !!data.openRouter,
-          azureSpeech: !!data.azureSpeech
+          azureSpeech: !!data.azureSpeech,
+          workIQ: !!data.workIQ,
+          fabricIQ: !!data.fabricIQ,
+          foundryIQ: !!data.foundryIQ
         });
       })
       .catch(() => {});
@@ -90,6 +96,16 @@ export function Footer() {
                 )}
                 <span className="text-[var(--text-secondary)]">
                   Azure Speech
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {envStatus.foundryIQ ? (
+                  <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                ) : (
+                  <XCircle size={13} className="text-rose-500 shrink-0" />
+                )}
+                <span className="text-[var(--text-secondary)]">
+                  Foundry IQ
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs">

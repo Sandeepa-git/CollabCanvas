@@ -62,7 +62,10 @@ export default function Home() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [envStatus, setEnvStatus] = useState({
     openRouter: false,
-    azureSpeech: false
+    azureSpeech: false,
+    workIQ: false,
+    fabricIQ: false,
+    foundryIQ: false
   });
   
   const boardRef = useRef<HTMLDivElement>(null);
@@ -104,7 +107,10 @@ export default function Home() {
       .then((data) => {
         setEnvStatus({
           openRouter: !!data.openRouter,
-          azureSpeech: !!data.azureSpeech
+          azureSpeech: !!data.azureSpeech,
+          workIQ: !!data.workIQ,
+          fabricIQ: !!data.fabricIQ,
+          foundryIQ: !!data.foundryIQ
         });
       })
       .catch(() => {});
@@ -276,7 +282,29 @@ export default function Home() {
 
         {/* Workspace Columns */}
         <section className="grid gap-6 lg:grid-cols-[430px_1fr]">
-          
+
+          {/* Runtime Integration Status */}
+          <div className="lg:col-span-2 flex flex-wrap gap-3 justify-center">
+            {[
+              { label: "OpenRouter", ready: envStatus.openRouter },
+              { label: "Azure Speech", ready: envStatus.azureSpeech },
+              { label: "Work IQ", ready: envStatus.workIQ },
+              { label: "Fabric IQ", ready: envStatus.fabricIQ },
+              { label: "Foundry IQ", ready: envStatus.foundryIQ }
+            ].map((item) => (
+              <span
+                key={item.label}
+                className={`rounded-full border px-3 py-1 text-xxs font-bold uppercase tracking-wide ${
+                  item.ready
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/25 bg-rose-500/10 text-rose-300"
+                }`}
+              >
+                {item.label}: {item.ready ? "Ready" : "Disabled"}
+              </span>
+            ))}
+          </div>
+
           {/* Left Column: Input Panel */}
           <div className={`${panelClass} flex flex-col gap-5 relative`}>
             <div className="flex items-center justify-between">

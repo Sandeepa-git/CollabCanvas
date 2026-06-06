@@ -17,6 +17,9 @@ export async function GET() {
   const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME ?? null;
 
   const azureSpeech = !!process.env.AZURE_SPEECH_KEY && !!process.env.AZURE_SPEECH_REGION;
+  const workIQ = !!process.env.WORK_IQ_ENDPOINT && !!process.env.WORK_IQ_API_KEY;
+  const fabricIQ = !!process.env.FABRIC_IQ_ENDPOINT && !!process.env.FABRIC_IQ_API_KEY;
+  const foundryIQ = !!process.env.FOUNDRY_IQ_ENDPOINT && !!process.env.FOUNDRY_IQ_API_KEY;
 
   const anyLLM = geminiKey || (openRouterKey && !disableOpenRouter) || azureOpenAIKey;
 
@@ -32,6 +35,9 @@ export async function GET() {
     azureEndpoint,
     azureDeployment,
     azureSpeech,
+    workIQ,
+    fabricIQ,
+    foundryIQ,
     anyLLM
   });
 }
