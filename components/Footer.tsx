@@ -72,7 +72,7 @@ export function Footer() {
           </div>
 
           {/* Connections / API Indicators */}
-          <div className="flex flex-col gap-4">
+          <div className="hidden flex-col gap-4">
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
               <Activity size={14} className="text-blue-500" />
               Active Connections

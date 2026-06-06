@@ -284,7 +284,7 @@ export default function Home() {
         <section className="grid gap-6 lg:grid-cols-[430px_1fr]">
 
           {/* Runtime Integration Status */}
-          <div className="lg:col-span-2 flex flex-wrap gap-3 justify-center">
+          <div className="lg:col-span-2 hidden flex-wrap gap-3 justify-center">
             {[
               { label: "OpenRouter", ready: envStatus.openRouter },
               { label: "Azure Speech", ready: envStatus.azureSpeech },
